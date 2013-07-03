@@ -193,7 +193,8 @@ class SpinBox(QtGui.QAbstractSpinBox):
         self.updateText()
 
 
-
+    @QtCore.Slot(int)
+    @QtCore.Slot(float)
     def setMaximum(self, m, update=True):
         """Set the maximum allowed value (or None for no limit)"""
         if m is not None:
@@ -201,7 +202,9 @@ class SpinBox(QtGui.QAbstractSpinBox):
         self.opts['bounds'][1] = m
         if update:
             self.setValue()
-    
+
+    @QtCore.Slot(int)
+    @QtCore.Slot(float)
     def setMinimum(self, m, update=True):
         """Set the minimum allowed value (or None for no limit)"""
         if m is not None:
@@ -209,10 +212,13 @@ class SpinBox(QtGui.QAbstractSpinBox):
         self.opts['bounds'][0] = m
         if update:
             self.setValue()
-        
+
+    @QtCore.Slot(bool)
     def setPrefix(self, p):
         self.setOpts(prefix=p)
-    
+
+    @QtCore.Slot(int,int)
+    @QtCore.Slot(float,float)
     def setRange(self, r0, r1):
         self.setOpts(bounds = [r0,r1])
         
@@ -223,17 +229,25 @@ class SpinBox(QtGui.QAbstractSpinBox):
                 #val = val.toDouble()[0]
             self.setValue(val)
         else:
-            print("Warning: SpinBox.setProperty('%s', ..) not supported." % prop)
+            setattr(self,prop,val)
+            #print("Warning: SpinBox.setProperty('%s', ..) not supported." % prop)
 
+    @QtCore.Slot('QString')
     def setSuffix(self, suf):
         self.setOpts(suffix=suf)
 
+    @QtCore.Slot(float)
+    @QtCore.Slot(int)
     def setSingleStep(self, step):
         self.setOpts(step=step)
         
+    @QtCore.Slot(int)
     def setDecimals(self, decimals):
         self.setOpts(decimals=decimals)
 
+    @QtCore.Slot(int,result=int)
+    @QtCore.Slot(result=float)
+    @QtCore.Slot(float,result=float)
     def value(self):
         """
         Return the value of this SpinBox.
@@ -486,7 +500,20 @@ class SpinBox(QtGui.QAbstractSpinBox):
     #def textChanged(self):
         #print "Text changed."
         
-        
+    #Properties definition
+    opts_int = QtCore.Property(bool,lambda x: x.opts['int'],lambda x,y: x.setOpts(int=y))
+    step = QtCore.Property(float,lambda x: x.opts['step'],setSingleStep)
+    maximum = QtCore.Property(float,lambda x: float('Inf') if x.opts['bounds'][1]==None
+            else x.opts['bounds'][1] ,setMaximum,lambda x: x.setMaximum(None))
+    minimum = QtCore.Property(float,lambda x: float('-Inf') if x.opts['bounds'][0]==None
+            else x.opts['bounds'][0] ,setMinimum,lambda x: x.setMinimum(None))
+    suffix = QtCore.Property('QString',lambda x: x.opts['suffix'],setSuffix)
+    siPrefix = QtCore.Property(bool,lambda x: x.opts['siPrefix'],setPrefix)
+    dec=QtCore.Property(bool,lambda x: x.opts['dec'],lambda x,y:x.setOpts(dec=y))
+    minStep=QtCore.Property(float,lambda x: x.opts['step'],lambda x,y:x.setOpts(minStep=y))
+    decimals=QtCore.Property(int,lambda x: x.opts['decimals'],setDecimals)
+    opts_value = QtCore.Property(float,value,setValue)
+
 ### Drop-in replacement for SpinBox; just for crash-testing
 #class SpinBox(QtGui.QDoubleSpinBox):
     #valueChanged = QtCore.Signal(object)     # (value)  for compatibility with QSpinBox
