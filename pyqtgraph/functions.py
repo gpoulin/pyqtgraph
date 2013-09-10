@@ -89,6 +89,7 @@ def siFormat(x, precision=3, suffix='', space=True, error=None, minVal=1e-25,
     
     Example::
         siFormat(0.0001, suffix='V')  # returns "100 μV"
+        siFormat(1000, suffix='V', error=23)  # returns "1 kV ± 23 V"
         siFormat(1000, suffix='V', error=23, groupedError=True)  # returns "1.00 ±  0.02   kV"
     """
     
@@ -112,32 +113,32 @@ def siFormat(x, precision=3, suffix='', space=True, error=None, minVal=1e-25,
         else:
             plusminus = " +/- "
         if groupedError:
-            width=3 if precision<3 else precision
-            error=error*p
-            x=x*p
-            prec_err=1
-            if x==0:
-                precision=0
-            elif error>=10:#What is the best formatting for this case?
-                err_log=int(np.log10(error))
-                x_log=int(np.log10(np.abs(x)))
-                error=round(error,-err_log)
-                prec_err=err_log+1 if err_log<5 else 5
-                precision=0
-                if error>x:
-                    x=round(x,-x_log)
+            width=3 if precision<3 else precision #get enough space to print
+            error = error*p
+            x = x*p
+            prec_err = 1
+            if x == 0:
+                precision = 0
+            elif error >= 10:#What is the best formatting for this case?
+                err_log = int(np.log10(error))
+                x_log = int(np.log10(np.abs(x)))
+                error = round(error, -err_log)
+                prec_err = err_log + 1 if err_log<5 else 5
+                precision = 0
+                if error > x:
+                    x = round(x, -x_log)
                 else:
-                    x=round(x,-err_log)
+                    x = round(x, -err_log)
 
-            elif not(error==0):
-                precision=int(-np.log10(error)+0.99999999)
+            elif not(error == 0):
+                precision = int(-np.log10(error) + 0.99999999)
 
-            if not(x==0) and precision+int(np.log10(np.abs(x)))+1>width:
-                precision=width-int(np.log10(np.abs(x)))-1
+            if not(x == 0) and precision + int(np.log10(np.abs(x))) + 1 > width:
+                precision = width - int(np.log10(np.abs(x))) - 1
 
-            fmt="{0:^{width}.{prec}f}{1}{2:^6.{err}g}{sp}{3}{4}"
-            return fmt.format(x,plusminus,error,pref,suffix,prec=str(precision),
-                    err=str(prec_err),sp=space,width=width+1)
+            fmt = asUnicode("{0:^{width}.{prec}f}{1}{2:^6.{err}g}{sp}{3}{4}")
+            return fmt.format(x, plusminus, error, pref, suffix, 
+                prec=str(precision), err=str(prec_err), sp=space, width=width+1)
         else:
             fmt = "%." + str(precision) + "g%s%s%s%s"
             return fmt % (x*p, pref, suffix, plusminus, siFormat(error,
@@ -153,7 +154,7 @@ def siEval(s):
     """
     
     s = asUnicode(s)
-    m = re.match(r'(-?((\d+(\.\d*)?)|(\.\d+))([eE]-?\d+)?)\s*([u' + SI_PREFIXES + r']?).*$', s)
+    m = re.match(r'(-?((\d+(\.\d*)?)|(\.\d+))([eE]-?\d+)?)\s*([u'+asUnicode('μ') + SI_PREFIXES + r']?).*$', s)
     if m is None:
         raise Exception("Can't convert string '%s' to number." % s)
     v = float(m.groups()[0])
@@ -162,7 +163,7 @@ def siEval(s):
         #raise Exception("Can't convert string '%s' to number--unknown prefix." % s)
     if p ==  '':
         n = 0
-    elif p == 'u':
+    elif p == 'u' or p == asUnicode('μ'): #µ != μ
         n = -2
     else:
         n = SI_PREFIXES.index(p) - 8
@@ -1110,14 +1111,29 @@ def arrayToQPath(x, y, connect='all'):
     should be connected, or an array of int32 values (0 or 1) indicating
     connections.
     """
-    
-    ## Create all vertices in path. The method used below creates a binary format so that all 
-    ## vertices can be read in at once. This binary format may change in future versions of Qt, 
+
+    ## Create all vertices in path. The method used below creates a binary format so that all
+    ## vertices can be read in at once. This binary format may change in future versions of Qt,
     ## so the original (slower) method is left here for emergencies:
-    #path.moveTo(x[0], y[0])
-    #for i in range(1, y.shape[0]):
-    #    path.lineTo(x[i], y[i])
-        
+        #path.moveTo(x[0], y[0])
+        #if connect == 'all':
+            #for i in range(1, y.shape[0]):
+                #path.lineTo(x[i], y[i])
+        #elif connect == 'pairs':
+            #for i in range(1, y.shape[0]):
+                #if i%2 == 0:
+                    #path.lineTo(x[i], y[i])
+                #else:
+                    #path.moveTo(x[i], y[i])
+        #elif isinstance(connect, np.ndarray):
+            #for i in range(1, y.shape[0]):
+                #if connect[i] == 1:
+                    #path.lineTo(x[i], y[i])
+                #else:
+                    #path.moveTo(x[i], y[i])
+        #else:
+            #raise Exception('connect argument must be "all", "pairs", or array')
+
     ## Speed this up using >> operator
     ## Format is:
     ##    numVerts(i4)   0(i4)
@@ -1127,76 +1143,60 @@ def arrayToQPath(x, y, connect='all'):
     ##    0(i4)
     ##
     ## All values are big endian--pack using struct.pack('>d') or struct.pack('>i')
-    
+
     path = QtGui.QPainterPath()
-    
+
     #prof = debug.Profiler('PlotCurveItem.generatePath', disabled=True)
-    if sys.version_info[0] == 2:   ## So this is disabled for python 3... why??
-        n = x.shape[0]
-        # create empty array, pad with extra space on either end
-        arr = np.empty(n+2, dtype=[('x', '>f8'), ('y', '>f8'), ('c', '>i4')])
-        # write first two integers
-        #prof.mark('allocate empty')
-        arr.data[12:20] = struct.pack('>ii', n, 0)
-        #prof.mark('pack header')
-        # Fill array with vertex values
-        arr[1:-1]['x'] = x
-        arr[1:-1]['y'] = y
-        
-        # decide which points are connected by lines
-        if connect == 'pairs':
-            connect = np.empty((n/2,2), dtype=np.int32)
-            connect[:,0] = 1
-            connect[:,1] = 0
-            connect = connect.flatten()
-            
-        if connect == 'all':
-            arr[1:-1]['c'] = 1
-        elif isinstance(connect, np.ndarray):
-            arr[1:-1]['c'] = connect
-        else:
-            raise Exception('connect argument must be "all", "pairs", or array')
-            
-        #prof.mark('fill array')
-        # write last 0
-        lastInd = 20*(n+1)
-        arr.data[lastInd:lastInd+4] = struct.pack('>i', 0)
-        #prof.mark('footer')
-        # create datastream object and stream into path
-        
-        ## Avoiding this method because QByteArray(str) leaks memory in PySide
-        #buf = QtCore.QByteArray(arr.data[12:lastInd+4])  # I think one unnecessary copy happens here
-        
-        path.strn = arr.data[12:lastInd+4] # make sure data doesn't run away
-        buf = QtCore.QByteArray.fromRawData(path.strn)
-        #prof.mark('create buffer')
-        ds = QtCore.QDataStream(buf)
-            
-        ds >> path
-        #prof.mark('load')
-        
-        #prof.finish()
+    n = x.shape[0]
+    # create empty array, pad with extra space on either end
+    arr = np.empty(n+2, dtype=[('x', '>f8'), ('y', '>f8'), ('c', '>i4')])
+    # write first two integers
+    #prof.mark('allocate empty')
+    byteview = arr.view(dtype=np.ubyte)
+    byteview[:12] = 0
+    byteview.data[12:20] = struct.pack('>ii', n, 0)
+    #prof.mark('pack header')
+    # Fill array with vertex values
+    arr[1:-1]['x'] = x
+    arr[1:-1]['y'] = y
+
+    # decide which points are connected by lines
+    if connect == 'pairs':
+        connect = np.empty((n/2,2), dtype=np.int32)
+        connect[:,0] = 1
+        connect[:,1] = 0
+        connect = connect.flatten()
+
+    if connect == 'all':
+        arr[1:-1]['c'] = 1
+    elif isinstance(connect, np.ndarray):
+        arr[1:-1]['c'] = connect
     else:
-        ## This does exactly the same as above, but less efficiently (and more simply).
-        path.moveTo(x[0], y[0])
-        if connect == 'all':
-            for i in range(1, y.shape[0]):
-                path.lineTo(x[i], y[i])
-        elif connect == 'pairs':
-            for i in range(1, y.shape[0]):
-                if i%2 == 0:
-                    path.lineTo(x[i], y[i])
-                else:
-                    path.moveTo(x[i], y[i])
-        elif isinstance(connect, np.ndarray):
-            for i in range(1, y.shape[0]):
-                if connect[i] == 1:
-                    path.lineTo(x[i], y[i])
-                else:
-                    path.moveTo(x[i], y[i])
-        else:
-            raise Exception('connect argument must be "all", "pairs", or array')
-            
+        raise Exception('connect argument must be "all", "pairs", or array')
+
+    #prof.mark('fill array')
+    # write last 0
+    lastInd = 20*(n+1)
+    byteview.data[lastInd:lastInd+4] = struct.pack('>i', 0)
+    #prof.mark('footer')
+    # create datastream object and stream into path
+
+    ## Avoiding this method because QByteArray(str) leaks memory in PySide
+    #buf = QtCore.QByteArray(arr.data[12:lastInd+4])  # I think one unnecessary copy happens here
+
+    path.strn = byteview.data[12:lastInd+4] # make sure data doesn't run away
+    try:
+        buf = QtCore.QByteArray.fromRawData(path.strn)
+    except TypeError:
+        buf = QtCore.QByteArray(bytes(path.strn))
+    #prof.mark('create buffer')
+    ds = QtCore.QDataStream(buf)
+
+    ds >> path
+    #prof.mark('load')
+
+    #prof.finish()
+
     return path
 
 #def isosurface(data, level):
