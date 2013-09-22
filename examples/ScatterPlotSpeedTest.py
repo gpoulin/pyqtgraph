@@ -33,19 +33,22 @@ win.show()
 
 p = ui.plot
 
-data = np.random.normal(size=(50,500), scale=100)
-sizeArray = (np.random.random(500) * 20.).astype(int)
+data = np.random.normal(size=(50,2000), scale=100)
+sizeArray = (np.random.random(2000) * 20.).astype(int)
 ptr = 0
 lastTime = time()
 fps = None
 def update():
     global curve, data, ptr, p, lastTime, fps
+    if ptr==315:
+        app.closeAllWindows()
     p.clear()
     if ui.randCheck.isChecked():
         size = sizeArray
     else:
         size = ui.sizeSpin.value()
-    curve = pg.ScatterPlotItem(x=data[ptr%50], y=data[(ptr+1)%50], pen='w', brush='b', size=size, pxMode=ui.pixelModeCheck.isChecked())
+    curve = pg.ScatterPlotItem(x=data[ptr%50], y=data[(ptr+1)%50], pen='w', brush='b', size=size, pxMode=True)
+    curve.addPoints(x=data[(ptr+1)%50], y=data[(ptr)%50],  pen='s', brush='r', size=size)
     p.addItem(curve)
     ptr += 1
     now = time()
@@ -62,7 +65,6 @@ def update():
 timer = QtCore.QTimer()
 timer.timeout.connect(update)
 timer.start(0)
-    
 
 
 ## Start Qt event loop unless running in interactive mode.
