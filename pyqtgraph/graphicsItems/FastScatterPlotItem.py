@@ -33,13 +33,8 @@ class Symbol(object):
         else:
             self.brush = fn.mkBrush(brush)
         
-        self.width = size + self.pen.widthF()
-        self.pixmap = None
-
-    def render(self):
-        if self.pixmap == None:
-            self.pixmap = QtGui.QPixmap(renderSymbol(self.symbol, self.size, self.pen, self.brush))
-        return self.pixmap
+        self.pixmap = QtGui.QPixmap(renderSymbol(self.symbol, self.size, self.pen, self.brush))
+        self.width = self.pixmap.width()
 
     def __eq__(self, other):
         attribute = ['pen', 'brush', 'symbol', 'size']
@@ -93,7 +88,6 @@ class FastScatterPlotItem(GraphicsObject):
             self._unusedSymbol[i] = False
             return i
         except ValueError:
-            symbol.render()
             self._maxWidth = max(self._maxWidth, symbol.width)
             for i in xrange(len(self._unusedSymbol)):
                 if self._unusedSymbol[i]:
@@ -233,5 +227,7 @@ class FastScatterPlotItem(GraphicsObject):
                 p.setPen(self._symbolList[i].pen)
                 list(imap(p.drawPoint, pts[0,mask], pts[1,mask]))
             else:
-                list(imap(p.drawPixmap, pts[0,mask], pts[1,mask], 
+                x = pts[0,mask] - self._symbolList[i].width/2.0
+                y = pts[1,mask] - self._symbolList[i].width/2.0
+                list(imap(p.drawPixmap, x, y, 
                     repeat(self._symbolList[i].pixmap)))
