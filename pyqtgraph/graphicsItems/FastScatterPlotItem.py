@@ -7,6 +7,7 @@ import pyqtgraph.functions as fn
 from .GraphicsObject import GraphicsObject
 import pyqtgraph.debug as debug
 from pyqtgraph.graphicsItems.ScatterPlotItem import renderSymbol
+import pyqtgraph as pg
 
 __all__ = ['FastScatterPlotItem']
 
@@ -30,9 +31,10 @@ class Symbol(object):
         self.img = None
 
     def render(self):
-        if self.img == None
+        if self.img == None:
             self.img = fn.imageToArray(renderSymbol(self.symbol, self.size, 
                 self.pen, self.brush), copy=False, transpose=False)
+
         return self.img
 
     def __eq__(self, other):
@@ -59,10 +61,11 @@ class FastScatterPlotItem(GraphicsObject):
         self.bounds = [None, None]  ## caches data bounds
         self.setData(*args, **kargs)
         
-    def setData(self, x, y, pen='l', brush='s', symbol='o', size=7):
+    def setData(self, x, y, pen='l', brush='s', symbol='o', size=7, pointMode=True):
+        self.pointMode=True
         self.clear()
         self.bounds = [None, None]
-        self.addPoints(*args, **kargs)
+        self.addPoints(x, y, pen, brush, symbol, size)
         self.cleanSymbol()
 
     def addPoints(self, x, y, pen='l', brush='s', symbol='o', size=7):
@@ -77,8 +80,9 @@ class FastScatterPlotItem(GraphicsObject):
         newData['x'] = x
         newData['y'] = y
         newData['symbol'] = i
-        for j in len(x):
-            self._QPoints.append(QtCore.QPointF(x[i], y[j]))
+        self._QPoints=map(QtCore.QPointF,x,y)
+        #for j in xrange(len(x)):
+        #    self._QPoints.append(QtCore.QPointF(x[j], y[j]))
         self.bounds = [None, None]
         self.prepareGeometryChange()
         self.update()
@@ -88,7 +92,7 @@ class FastScatterPlotItem(GraphicsObject):
         Add a symbol to the list of symbol and return the index of the symbol
         """
         try: ## check if the symbol is already there
-            i = self.symbolList.index(symbol)
+            i = self._symbolList.index(symbol)
             self._unusedSymbol[i] = False
             return i
         except ValueError:
@@ -100,7 +104,7 @@ class FastScatterPlotItem(GraphicsObject):
                     self._symbolList[i] = symbol
                     return i
         self._symbolList.append(symbol)
-        i=len(self.symbolList) - 1
+        i=len(self._symbolList) - 1
         self._symbolList[i] = symbol
         return i
 
@@ -121,14 +125,14 @@ class FastScatterPlotItem(GraphicsObject):
         """Remove unused symbol from the cache"""
         self._unusedSymbol = deque()
         symbol = []
-        data = []
         self._maxWidth = 0
         used = np.unique(self.data['symbol']).sort() ## to make sure to keep good symbol
         i = 0
-        for x in used:
-            symbol.append(self._symbolList[x])
-            self.data['symbol'][self.data['symbol'] == x] = i
-            i += 1
+        if used != None:
+            for x in used:
+                symbol.append(self._symbolList[x])
+                self.data['symbol'][self.data['symbol'] == x] = i
+                i += 1
         self._symbolList = symbol
         self._spriteValid = False
 
@@ -163,7 +167,9 @@ class FastScatterPlotItem(GraphicsObject):
             return (np.percentile(d, 50 - (frac * 50)), np.percentile(d, 50 + (frac * 50)))
             
     def pixelPadding(self):
-        return self.maxWidth*0.7072
+        if self.pointMode:
+            return 0.7072
+        return self._maxWidth*0.7072
 
     def boundingRect(self):
         (xmn, xmx) = self.dataBounds(ax=0)
@@ -251,7 +257,7 @@ class FastScatterPlotItem(GraphicsObject):
             self.atlasData[x:x+w, y:y+h] = rendered[key]
         self.atlas = None
         self.atlasValid = True
-        self.max_width=maxWidth
+        self._max_width=maxWidth
 
 
     def _generateFragments(self):
@@ -261,7 +267,7 @@ class FastScatterPlotItem(GraphicsObject):
         self.fragments = []
         for i in xrange(len(self.data)):
             pos = tr.map(self._QPoints[i])
-            rect = self._symbolRectF[self.data['symbol'][i]
+            rect = self._symbolRectF[self.data['symbol'][i]]
             self.fragments.append(QtGui.QPainter.PixmapFragment.create(pos, rect))
             
     def setExportMode(self, *args, **kwds):
@@ -280,6 +286,15 @@ class FastScatterPlotItem(GraphicsObject):
         
         p.setRenderHint(p.Antialiasing, aa)            
         p.resetTransform()
+
+        if self.pointMode:
+            tr = self.deviceTransform()
+            if tr is None:
+                return
+            liste = map(tr.map,self._QPoints)
+            map(p.drawPoints,liste)
+            #p.drawPoints(*liste,len(liste))
+            return
 
         if not self._spriteValid:
             self._generateSprite()
