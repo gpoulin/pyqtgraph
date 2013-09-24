@@ -45,7 +45,6 @@ class GraphicsView(QtGui.QGraphicsView):
     sigTransformChanged = QtCore.Signal(object)
     sigMouseReleased = QtCore.Signal(object)
     sigSceneMouseMoved = QtCore.Signal(object)
-    #sigRegionChanged = QtCore.Signal(object)
     sigScaleChanged = QtCore.Signal(object)
     lastFileDir = None
     
@@ -129,6 +128,14 @@ class GraphicsView(QtGui.QGraphicsView):
             self.setRenderHints(self.renderHints() | QtGui.QPainter.Antialiasing)
         else:
             self.setRenderHints(self.renderHints() & ~QtGui.QPainter.Antialiasing)
+
+    @QtCore.Property("bool")
+    def antialiasing(self):
+        return bool(self.renderHints() & QtGui.QPainter.Antialiasing)
+
+    @antialiasing.setter
+    def antialiasing(self,value):
+        self.setAntialiasing(value)
         
     def setBackground(self, background):
         """
@@ -141,7 +148,7 @@ class GraphicsView(QtGui.QGraphicsView):
             background = pyqtgraph.getConfigOption('background')
         brush = fn.mkBrush(background)
         self.setBackgroundBrush(brush)
-    
+
     def paintEvent(self, ev):
         self.scene().prepareForPaint()
         #print "GV: paint", ev.rect()
@@ -190,8 +197,16 @@ class GraphicsView(QtGui.QGraphicsView):
         return self.scene().removeItem(*args)
         
     def enableMouse(self, b=True):
-        self.mouseEnabled = b
+        self._mouseEnabled = b
         self.autoPixelRange = (not b)
+
+    @QtCore.Property(bool)
+    def mouseEnabled(self):
+        return self._mouseEnabled
+
+    @mouseEnabled.setter
+    def mouseEnabled(self, value):
+        self.enableMouse(value)
         
     def clearMouse(self):
         self.mouseTrail = []
@@ -384,5 +399,3 @@ class GraphicsView(QtGui.QGraphicsView):
         
     def dragEnterEvent(self, ev):
         ev.ignore()  ## not sure why, but for some reason this class likes to consume drag events
-        
-

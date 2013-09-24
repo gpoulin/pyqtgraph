@@ -22,23 +22,18 @@ class PyPlotWidgetPlugin(QtDesigner.QPyDesignerCustomWidgetPlugin):
     # The __init__() method is only used to set up the plugin and define its
     # initialized variable.
     def __init__(self, parent=None):
-
         super(PyPlotWidgetPlugin, self).__init__(parent)
-
         self.initialized = False
 
     # The initialize() and isInitialized() methods allow the plugin to set up
     # any required resources, ensuring that this can only happen once for each
     # plugin.
     def initialize(self, core):
-
         if self.initialized:
             return
-
         self.initialized = True
 
     def isInitialized(self):
-
         return self.initialized
 
     # This factory method creates new instances of our custom widget with the

@@ -39,7 +39,7 @@ class SpinBox(QtGui.QAbstractSpinBox):
     ## I have no idea how to get around this..
     
     
-    valueChanged = QtCore.Signal(object)     # (value)  for compatibility with QSpinBox
+    valueChanged = QtCore.Signal(float)     # (value)  for compatibility with QSpinBox
     sigValueChanged = QtCore.Signal(object)  # (self)
     sigValueChanging = QtCore.Signal(object, object)  # (self, value)  sent immediately; no delay.
     
